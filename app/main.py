@@ -5,8 +5,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routers import auth as auth_router
+from app.api.routers import documents as documents_router
 from app.config import settings
-from app.core.qdrant import close_qdrant_client, get_qdrant_client
+from app.core.qdrant import close_qdrant_client, ensure_collection, get_qdrant_client
 from app.core.redis import close_redis_pool, get_redis_pool
 
 # Setup logging configuration
@@ -25,6 +27,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("%s v%s starting up", settings.app_title, settings.app_version)
     get_redis_pool()
     get_qdrant_client()
+    await ensure_collection()
     logger.info("All infrastructure clients initialized")
     yield
     # Shutdown phase
@@ -56,7 +59,6 @@ app.add_middleware(
 )
 
 
-
 # Health check
 @app.get(
     "/health",
@@ -71,3 +73,9 @@ async def health_check() -> dict[str, str]:
         "service": settings.app_title,
         "version": settings.app_version,
     }
+
+
+API_V1_PREFIX = "/api/v1"
+
+app.include_router(auth_router.router, prefix=API_V1_PREFIX)
+app.include_router(documents_router.router, prefix=API_V1_PREFIX)
