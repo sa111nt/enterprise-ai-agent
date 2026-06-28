@@ -5,13 +5,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.agent.graph import initialize_graph, shutdown_graph
+from app.api.routers import agent as agent_router
 from app.api.routers import auth as auth_router
 from app.api.routers import documents as documents_router
 from app.config import settings
 from app.core.qdrant import close_qdrant_client, ensure_collection, get_qdrant_client
 from app.core.redis import close_redis_pool, get_redis_pool
 
-# Setup logging configuration
 logging.basicConfig(
     level=logging.DEBUG if settings.debug else logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -20,7 +21,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# FastAPI Lifespan Manager
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup phase
@@ -28,15 +28,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     get_redis_pool()
     get_qdrant_client()
     await ensure_collection()
+    await initialize_graph()
     logger.info("All infrastructure clients initialized")
     yield
-    # Shutdown phase
+    await shutdown_graph()
     await close_qdrant_client()
     await close_redis_pool()
     logger.info("%s shut down gracefully", settings.app_title)
 
 
-# Initialize FastAPI Application
 app = FastAPI(
     title=settings.app_title,
     version=settings.app_version,
@@ -49,7 +49,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS Middleware Setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -59,7 +58,6 @@ app.add_middleware(
 )
 
 
-# Health check
 @app.get(
     "/health",
     tags=["System"],
@@ -79,3 +77,4 @@ API_V1_PREFIX = "/api/v1"
 
 app.include_router(auth_router.router, prefix=API_V1_PREFIX)
 app.include_router(documents_router.router, prefix=API_V1_PREFIX)
+app.include_router(agent_router.router, prefix=API_V1_PREFIX)

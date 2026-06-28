@@ -21,12 +21,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def create_access_token(data: dict) -> str:
-    to_encode = data.copy()
+def create_access_token(subject: str) -> str:
     expire = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
         minutes=settings.access_token_expire_minutes
     )
-    to_encode.update({"exp": expire, "type": "access"})
+    to_encode = {"sub": subject, "exp": expire, "type": "access"}
     return jwt.encode(
         to_encode,
         settings.jwt_secret_key,
@@ -34,12 +33,11 @@ def create_access_token(data: dict) -> str:
     )
 
 
-def create_refresh_token(data: dict) -> str:
-    to_encode = data.copy()
+def create_refresh_token(subject: str) -> str:
     expire = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
         days=settings.refresh_token_expire_days
     )
-    to_encode.update({"exp": expire, "type": "refresh"})
+    to_encode = {"sub": subject, "exp": expire, "type": "refresh"}
     return jwt.encode(
         to_encode,
         settings.jwt_secret_key,
@@ -54,5 +52,5 @@ def decode_token(token: str, expected_type: str = "access") -> dict:
         algorithms=[settings.jwt_algorithm],
     )
     if payload.get("type") != expected_type:
-        raise jwt.InvalidTokenError("Invalid token type")
+        raise ValueError(f"Expected {expected_type} token, got {payload.get('type')!r}")
     return payload

@@ -6,9 +6,10 @@ from sqlalchemy import select
 
 from app.core.database import get_async_db
 from app.core.security import decode_token
-from app.models.employee import Employee
+from app.models.employee import Employee, EmployeeRole
 from app.services.auth_service import AuthService
 from app.services.document_service import DocumentService
+from app.services.agent_service import AgentService
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -51,6 +52,17 @@ async def get_current_employee(
     return employee
 
 
+async def require_admin(
+    employee: Employee = Depends(get_current_employee),
+) -> Employee:
+    if employee.role != EmployeeRole.admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
+    return employee
+
+
 async def get_auth_service(
     session: AsyncSession = Depends(get_async_db),
 ) -> AuthService:
@@ -61,3 +73,7 @@ async def get_document_service(
     session: AsyncSession = Depends(get_async_db),
 ) -> DocumentService:
     return DocumentService(session)
+
+
+def get_agent_service() -> AgentService:
+    return AgentService()
