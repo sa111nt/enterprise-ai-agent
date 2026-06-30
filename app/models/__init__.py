@@ -6,6 +6,7 @@ from app.models.department import Department
 from app.models.document import Document
 from app.models.employee import Employee, EmployeeRole
 from app.models.onboarding import OnboardingProgress, OnboardingTask, ProgressStatus
+from app.models.thread import Thread
 
 __all__ = [
     "Base",
@@ -18,4 +19,5 @@ __all__ = [
     "OnboardingProgress",
     "OnboardingTask",
     "ProgressStatus",
+    "Thread",
 ]

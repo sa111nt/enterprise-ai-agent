@@ -1,0 +1,47 @@
+# Web Framework & ASGI Server
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+
+# Validation & Configuration
+pydantic[email]==2.10.3
+pydantic-settings==2.6.1
+
+# Database & ORM
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+psycopg[binary]==3.2.4
+
+# Security & Auth
+pwdlib[argon2]==0.2.1
+pyjwt==2.10.1
+
+# Redis (async)
+redis==5.2.1
+
+# Qdrant (async vector DB client)
+qdrant-client==1.12.1
+
+# AI / LLM / LangChain
+langchain==0.3.14
+langchain-core==0.3.30
+langchain-openai==0.3.0
+langgraph==0.2.62
+langgraph-checkpoint-postgres==2.0.12
+
+# RAG: PDF parsing & text splitting
+langchain-community==0.3.14
+pypdf==5.1.0
+
+# SSE Streaming
+sse-starlette==2.2.1
+
+# Linting & Formatting (dev)
+ruff==0.8.4
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.25.0
+httpx==0.28.1
+aiosqlite==0.20.0
