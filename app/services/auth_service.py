@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 import jwt
@@ -5,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.redis import get_redis_client
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -21,6 +23,7 @@ logger = logging.getLogger(__name__)
 class AuthService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+        self.redis = get_redis_client()
 
     async def register(self, data: RegisterRequest) -> Employee:
         stmt = select(Employee).where(Employee.email == data.email)
@@ -76,6 +79,24 @@ class AuthService:
             refresh_token=create_refresh_token(subject=employee.email),
         )
 
+    async def logout(self, access_token: str, refresh_token: str) -> None:
+        for token, token_type in [(access_token, "access"), (refresh_token, "refresh")]:
+            if not token:
+                continue
+            try:
+                payload = decode_token(token, expected_type=token_type)
+                jti = payload.get("jti")
+                exp = payload.get("exp")
+                if jti and exp:
+                    ttl = max(
+                        0,
+                        int(exp) - int(datetime.datetime.now(datetime.UTC).timestamp()),
+                    )
+                    if ttl > 0:
+                        await self.redis.setex(f"blacklist:{jti}", ttl, "revoked")
+            except Exception:
+                pass
+
     async def refresh_tokens(self, refresh_token: str) -> TokenPair:
         credentials_exception = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -86,8 +107,13 @@ class AuthService:
         try:
             payload = decode_token(refresh_token, expected_type="refresh")
             email: str | None = payload.get("sub")
+            jti: str | None = payload.get("jti")
             if email is None:
                 raise credentials_exception
+            if jti:
+                is_blacklisted = await self.redis.exists(f"blacklist:{jti}")
+                if is_blacklisted:
+                    raise credentials_exception
         except jwt.ExpiredSignatureError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

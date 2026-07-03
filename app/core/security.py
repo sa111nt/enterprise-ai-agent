@@ -1,7 +1,8 @@
-"""Password hashing and JWT token management."""
+﻿"""Password hashing and JWT token management."""
 
 import datetime
 import logging
+import uuid
 
 import jwt
 from pwdlib import PasswordHash
@@ -25,7 +26,12 @@ def create_access_token(subject: str) -> str:
     expire = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
         minutes=settings.access_token_expire_minutes
     )
-    to_encode = {"sub": subject, "exp": expire, "type": "access"}
+    to_encode = {
+        "sub": subject,
+        "exp": expire,
+        "type": "access",
+        "jti": uuid.uuid4().hex,
+    }
     return jwt.encode(
         to_encode,
         settings.jwt_secret_key,
@@ -37,7 +43,12 @@ def create_refresh_token(subject: str) -> str:
     expire = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
         days=settings.refresh_token_expire_days
     )
-    to_encode = {"sub": subject, "exp": expire, "type": "refresh"}
+    to_encode = {
+        "sub": subject,
+        "exp": expire,
+        "type": "refresh",
+        "jti": uuid.uuid4().hex,
+    }
     return jwt.encode(
         to_encode,
         settings.jwt_secret_key,
@@ -52,5 +63,7 @@ def decode_token(token: str, expected_type: str = "access") -> dict:
         algorithms=[settings.jwt_algorithm],
     )
     if payload.get("type") != expected_type:
-        raise ValueError(f"Expected {expected_type} token, got {payload.get('type')!r}")
+        raise jwt.InvalidTokenError("Invalid token type")
     return payload
+
+
