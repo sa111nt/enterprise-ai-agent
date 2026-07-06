@@ -1,12 +1,13 @@
-from sqlalchemy import or_, select
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
+from sqlalchemy import or_, select
 
 from app.core.database import AsyncSessionLocal
 from app.models.employee import Employee
 
 
 @tool
-async def employee_lookup(identifier: str) -> str:
+async def employee_lookup(identifier: str, config: RunnableConfig) -> str:
     """Look up an employee's profile by their numeric ID or full/partial name.
 
     Use this tool when the user asks about their own profile, their manager,
@@ -31,6 +32,12 @@ async def employee_lookup(identifier: str) -> str:
 
         if employee is None:
             return f"Employee '{identifier}' not found."
+
+        caller_id = config.get("configurable", {}).get("employee_id")
+        caller_role = config.get("configurable", {}).get("employee_role")
+
+        if caller_role != "admin" and caller_id != employee.id:
+            return "You do not have permission to view personal information for this employee."
 
         dept_name = employee.department.name if employee.department else "N/A"
         manager_name = (

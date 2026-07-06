@@ -1,5 +1,6 @@
-from sqlalchemy import select
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
+from sqlalchemy import select
 
 from app.core.database import AsyncSessionLocal
 from app.models.employee import Employee
@@ -7,7 +8,7 @@ from app.models.onboarding import OnboardingProgress, OnboardingTask
 
 
 @tool
-async def onboarding_status(employee_id: int) -> str:
+async def onboarding_status(employee_id: int, config: RunnableConfig) -> str:
     """Check onboarding task completion status for a specific employee.
 
     Use this tool when the user asks about their onboarding progress,
@@ -18,6 +19,12 @@ async def onboarding_status(employee_id: int) -> str:
         employee = await session.get(Employee, employee_id)
         if employee is None:
             return f"Employee with id={employee_id} not found."
+
+        caller_id = config.get("configurable", {}).get("employee_id")
+        caller_role = config.get("configurable", {}).get("employee_role")
+
+        if caller_role != "admin" and caller_id != employee.id:
+            return "You do not have permission to view onboarding status for this employee."
 
         stmt = (
             select(OnboardingTask, OnboardingProgress)

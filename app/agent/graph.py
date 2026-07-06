@@ -12,15 +12,16 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 _graph: CompiledGraph | None = None
+_checkpointer_cm = None
 _checkpointer: AsyncPostgresSaver | None = None
 
 
 async def initialize_graph() -> None:
-    global _graph, _checkpointer
+    global _graph, _checkpointer, _checkpointer_cm
 
     conn_string = settings.database_url.replace("+asyncpg", "")
-    _checkpointer = AsyncPostgresSaver.from_conn_string(conn_string)
-    await _checkpointer.__aenter__()
+    _checkpointer_cm = AsyncPostgresSaver.from_conn_string(conn_string)
+    _checkpointer = await _checkpointer_cm.__aenter__()
     await _checkpointer.setup()
     logger.info("PostgreSQL checkpointer initialized")
 
@@ -48,9 +49,10 @@ def get_graph() -> CompiledGraph:
 
 
 async def shutdown_graph() -> None:
-    global _graph, _checkpointer
-    if _checkpointer is not None:
-        await _checkpointer.__aexit__(None, None, None)
+    global _graph, _checkpointer, _checkpointer_cm
+    if _checkpointer_cm is not None:
+        await _checkpointer_cm.__aexit__(None, None, None)
         logger.info("PostgreSQL checkpointer closed")
     _graph = None
     _checkpointer = None
+    _checkpointer_cm = None

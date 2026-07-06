@@ -1,5 +1,5 @@
-from sqlalchemy import or_, select
 from langchain_core.tools import tool
+from sqlalchemy import or_, select
 
 from app.core.database import AsyncSessionLocal
 from app.models.contact import Contact

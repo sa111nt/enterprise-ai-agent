@@ -1,5 +1,5 @@
-from sqlalchemy import func, select
 from langchain_core.tools import tool
+from sqlalchemy import func, select
 
 from app.core.database import AsyncSessionLocal
 from app.models.department import Department

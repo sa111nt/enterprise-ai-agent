@@ -3,29 +3,51 @@ import logging
 import uuid
 from collections.abc import AsyncGenerator
 
+from fastapi import HTTPException, status
 from langchain_core.messages import HumanMessage
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.graph import get_graph
 from app.agent.tools import PERSONAL_DATA_TOOLS
 from app.core.redis import get_redis_client
 from app.models.employee import Employee
+from app.models.thread import Thread
 from app.rag.cache import SemanticCache
 
 logger = logging.getLogger(__name__)
 
 
 class AgentService:
-    def __init__(self) -> None:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
         self.cache = SemanticCache(get_redis_client())
+
+    async def validate_thread(self, thread_id: str | None, employee_id: int) -> str:
+        if thread_id is None:
+            thread_id = uuid.uuid4().hex
+            thread = Thread(id=thread_id, employee_id=employee_id)
+            self.session.add(thread)
+            await self.session.commit()
+            return thread_id
+
+        thread = await self.session.get(Thread, thread_id)
+        if thread is None:
+            thread = Thread(id=thread_id, employee_id=employee_id)
+            self.session.add(thread)
+            await self.session.commit()
+        elif thread.employee_id != employee_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access to this thread is forbidden.",
+            )
+        return thread_id
 
     async def stream(
         self,
         message: str,
-        thread_id: str | None,
+        thread_id: str,
         employee: Employee,
     ) -> AsyncGenerator[dict, None]:
-        thread_id = thread_id or uuid.uuid4().hex
-
         # 1. Check semantic cache
         cached_answer = await self.cache.get(message)
         if cached_answer is not None:
@@ -50,7 +72,13 @@ class AgentService:
             f"employee_id={employee.id}]\n\n{message}"
         )
         input_messages = {"messages": [HumanMessage(content=enriched)]}
-        config = {"configurable": {"thread_id": thread_id}}
+        config = {
+            "configurable": {
+                "thread_id": thread_id,
+                "employee_id": employee.id,
+                "employee_role": employee.role.value,
+            }
+        }
 
         # 3. Stream agent response
         graph = get_graph()
