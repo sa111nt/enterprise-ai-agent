@@ -61,7 +61,9 @@ async def ingest_pdf(
                 "chunk_index": i,
             },
         )
-        for i, (chunk, text, vector) in enumerate(zip(chunks, texts, vectors))
+        for i, (chunk, text, vector) in enumerate(
+            zip(chunks, texts, vectors, strict=False)
+        )
     ]
 
     # 5. Upsert into Qdrant

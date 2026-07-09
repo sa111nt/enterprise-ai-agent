@@ -1,7 +1,7 @@
 [project]
 name = "enterprise-ai-agent"
 version = "1.0.0"
-description = "Enterprise Cloud AI Agent & RAG System — Corporate HR Assistant"
+description = "Enterprise Cloud AI Agent & RAG System - Corporate HR Assistant"
 requires-python = ">=3.12"
 
 [tool.ruff]
@@ -25,4 +25,4 @@ indent-style = "space"
 [tool.pytest.ini_options]
 pythonpath = ["."]
 asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
+asyncio_default_fixture_loop_scope = "session"
