@@ -1,13 +1,17 @@
 import datetime
 import enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
+if TYPE_CHECKING:
+    from app.models.employee import Employee
 
-class OnboardingTask(TimestampMixin, Base):
+
+class OnboardingTask(Base, TimestampMixin):
     """Template task that every new employee must complete."""
 
     __tablename__ = "onboarding_tasks"
@@ -23,8 +27,7 @@ class OnboardingTask(TimestampMixin, Base):
         comment="Number of days from hire_date to complete this task",
     )
 
-    progress_entries = relationship(
-        "OnboardingProgress",
+    progress_entries: Mapped[list["OnboardingProgress"]] = relationship(
         back_populates="task",
         lazy="selectin",
     )
@@ -38,7 +41,7 @@ class ProgressStatus(str, enum.Enum):
     completed = "completed"
 
 
-class OnboardingProgress(TimestampMixin, Base):
+class OnboardingProgress(Base, TimestampMixin):
     """Tracks individual employee's progress on an onboarding task."""
 
     __tablename__ = "onboarding_progress"
@@ -65,12 +68,10 @@ class OnboardingProgress(TimestampMixin, Base):
         nullable=True,
     )
 
-    employee = relationship(
-        "Employee",
+    employee: Mapped["Employee"] = relationship(
         back_populates="onboarding_progress",
     )
-    task = relationship(
-        "OnboardingTask",
+    task: Mapped["OnboardingTask"] = relationship(
         back_populates="progress_entries",
     )
 

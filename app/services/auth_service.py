@@ -75,8 +75,8 @@ class AuthService:
 
         logger.info("Employee id=%s logged in", employee.id)
         return TokenPair(
-            access_token=create_access_token(subject=employee.email),
-            refresh_token=create_refresh_token(subject=employee.email),
+            access_token=create_access_token(data={"sub": employee.email}),
+            refresh_token=create_refresh_token(data={"sub": employee.email}),
         )
 
     async def logout(self, access_token: str, refresh_token: str) -> None:
@@ -138,6 +138,6 @@ class AuthService:
 
         logger.info("Employee id=%s refreshed tokens", employee.id)
         return TokenPair(
-            access_token=create_access_token(subject=employee.email),
-            refresh_token=create_refresh_token(subject=employee.email),
+            access_token=create_access_token(data={"sub": employee.email}),
+            refresh_token=create_refresh_token(data={"sub": employee.email}),
         )

@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 
 from fastapi import HTTPException, status
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.graph import get_graph
@@ -24,18 +25,18 @@ class AgentService:
 
     async def validate_thread(self, thread_id: str | None, employee_id: int) -> str:
         if thread_id is None:
-            thread_id = uuid.uuid4().hex
-            thread = Thread(id=thread_id, employee_id=employee_id)
+            new_thread_id = uuid.uuid4().hex
+            thread = Thread(id=new_thread_id, employee_id=employee_id)
             self.session.add(thread)
             await self.session.commit()
-            return thread_id
+            return new_thread_id
 
-        thread = await self.session.get(Thread, thread_id)
-        if thread is None:
+        existing_thread = await self.session.get(Thread, thread_id)
+        if existing_thread is None:
             thread = Thread(id=thread_id, employee_id=employee_id)
             self.session.add(thread)
             await self.session.commit()
-        elif thread.employee_id != employee_id:
+        elif existing_thread.employee_id != employee_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access to this thread is forbidden.",
@@ -72,7 +73,7 @@ class AgentService:
             f"employee_id={employee.id}]\n\n{message}"
         )
         input_messages = {"messages": [HumanMessage(content=enriched)]}
-        config = {
+        config: RunnableConfig = {
             "configurable": {
                 "thread_id": thread_id,
                 "employee_id": employee.id,

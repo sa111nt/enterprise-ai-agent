@@ -1,9 +1,11 @@
 import asyncio
 import os
 import sys
+from typing import cast
 
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
@@ -57,7 +59,7 @@ async def evaluate():
     results = []
 
     # Dummy employee context for testing
-    config = {
+    config: RunnableConfig = {
         "configurable": {
             "thread_id": "eval_thread_123",
             "employee_id": 1,
@@ -95,15 +97,16 @@ async def evaluate():
             Question asked: {item['question']}
             Expected Answer Properties: {item['expected_answer_properties']}
             Expected Tool to be used: {item['expected_tool']}
-            
+
             Agent's Answer: {final_answer}
             Tools actually used by Agent: {tools_called}
-            
+
             Evaluate if the agent's answer is correct and if it used the expected tool.
             """
 
-            evaluation: EvaluationResult = await judge_llm.ainvoke(
-                [HumanMessage(content=judge_prompt)]
+            evaluation: EvaluationResult = cast(
+                EvaluationResult,
+                await judge_llm.ainvoke([HumanMessage(content=judge_prompt)]),
             )
 
             print(f"Evaluation Correct: {evaluation.is_correct}")

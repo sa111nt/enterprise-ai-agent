@@ -73,7 +73,7 @@ class SemanticCache:
         query_vec = await embeddings.aembed_query(query)
 
         key = f"sem_cache:{uuid.uuid4().hex}"
-        await self.redis.hset(
+        await self.redis.hset(  # type: ignore[misc]
             key,
             mapping={
                 "query": query,

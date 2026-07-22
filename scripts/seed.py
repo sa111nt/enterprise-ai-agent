@@ -3,6 +3,7 @@
 import asyncio
 import datetime
 import logging
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 async def seed_departments(session: AsyncSession) -> dict[str, Department]:
-    departments_data = [
+    departments_data: list[dict[str, str]] = [
         {
             "name": "Engineering",
             "description": "Software development and infrastructure",
@@ -38,7 +39,7 @@ async def seed_departments(session: AsyncSession) -> dict[str, Department]:
         },
     ]
 
-    departments = {}
+    departments: dict[str, Department] = {}
     for data in departments_data:
         stmt = select(Department).where(Department.name == data["name"])
         existing = (await session.execute(stmt)).scalar_one_or_none()
@@ -57,7 +58,7 @@ async def seed_employees(
     session: AsyncSession,
     departments: dict[str, Department],
 ) -> dict[str, Employee]:
-    employees_data = [
+    employees_data: list[dict[str, Any]] = [
         {
             "first_name": "Admin",
             "last_name": "User",
@@ -97,7 +98,7 @@ async def seed_employees(
         },
     ]
 
-    employees = {}
+    employees: dict[str, Employee] = {}
     for data in employees_data:
         stmt = select(Employee).where(Employee.email == data["email"])
         existing = (await session.execute(stmt)).scalar_one_or_none()
@@ -202,7 +203,7 @@ async def seed_contacts(
     session: AsyncSession,
     departments: dict[str, Department],
 ) -> None:
-    contacts_data = [
+    contacts_data: list[dict[str, Any]] = [
         {
             "name": "IT Help Desk",
             "role": "Technical Support",

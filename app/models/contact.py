@@ -1,10 +1,15 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
+if TYPE_CHECKING:
+    from app.models.department import Department
 
-class Contact(TimestampMixin, Base):
+
+class Contact(Base, TimestampMixin):
     __tablename__ = "contacts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -19,8 +24,7 @@ class Contact(TimestampMixin, Base):
         nullable=True,
     )
 
-    department = relationship(
-        "Department",
+    department: Mapped["Department | None"] = relationship(
         back_populates="contacts",
     )
 

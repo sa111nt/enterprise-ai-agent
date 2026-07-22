@@ -1,10 +1,16 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
+if TYPE_CHECKING:
+    from app.models.contact import Contact
+    from app.models.employee import Employee
 
-class Department(TimestampMixin, Base):
+
+class Department(Base, TimestampMixin):
     __tablename__ = "departments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -17,19 +23,16 @@ class Department(TimestampMixin, Base):
         nullable=True,
     )
 
-    head = relationship(
-        "Employee",
+    head: Mapped["Employee | None"] = relationship(
         foreign_keys=[head_id],
         lazy="selectin",
     )
-    employees = relationship(
-        "Employee",
+    employees: Mapped[list["Employee"]] = relationship(
         back_populates="department",
         foreign_keys="Employee.department_id",
         lazy="selectin",
     )
-    contacts = relationship(
-        "Contact",
+    contacts: Mapped[list["Contact"]] = relationship(
         back_populates="department",
         lazy="selectin",
     )

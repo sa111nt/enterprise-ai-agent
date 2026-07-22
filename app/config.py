@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # --- PostgreSQL ---
-    database_url: str
+    database_url: str = ""
 
     # --- Redis ---
     redis_url: str = "redis://localhost:6379/0"
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
 
     # --- JWT ---
-    jwt_secret_key: str
+    jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7

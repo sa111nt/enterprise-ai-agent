@@ -1,6 +1,8 @@
 import datetime
 from collections.abc import AsyncGenerator
+from typing import Any
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import pool
@@ -88,14 +90,50 @@ async def admin_employee(db_session: AsyncSession) -> Employee:
 
 @pytest_asyncio.fixture(scope="function")
 async def auth_headers(test_employee: Employee) -> dict[str, str]:
-    token = create_access_token(test_employee.email)
+    token = create_access_token({"sub": test_employee.email})
     return {"Authorization": f"Bearer {token}"}
 
 
 @pytest_asyncio.fixture(scope="function")
 async def admin_auth_headers(admin_employee: Employee) -> dict[str, str]:
-    token = create_access_token(admin_employee.email)
+    token = create_access_token({"sub": admin_employee.email})
     return {"Authorization": f"Bearer {token}"}
+
+
+class FakeRedis:
+    def __init__(self) -> None:
+        self._data: dict[str, Any] = {}
+
+    async def exists(self, *keys: str) -> int:
+        return sum(1 for k in keys if k in self._data)
+
+    async def setex(self, key: str, time: int, value: Any) -> bool:
+        self._data[key] = value
+        return True
+
+    async def incr(self, key: str) -> int:
+        val = int(self._data.get(key, 0)) + 1
+        self._data[key] = val
+        return val
+
+    async def expire(self, key: str, time: int) -> bool:
+        return True
+
+    async def get(self, key: str) -> Any:
+        return self._data.get(key)
+
+    async def aclose(self) -> None:
+        pass
+
+
+@pytest_asyncio.fixture(scope="function", autouse=True)
+def mock_redis(monkeypatch: pytest.MonkeyPatch) -> FakeRedis:
+    fake = FakeRedis()
+    monkeypatch.setattr("app.core.redis.get_redis_client", lambda: fake)
+    monkeypatch.setattr("app.api.dependencies.get_redis_client", lambda: fake)
+    monkeypatch.setattr("app.services.auth_service.get_redis_client", lambda: fake)
+    monkeypatch.setattr("app.services.agent_service.get_redis_client", lambda: fake)
+    return fake
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)

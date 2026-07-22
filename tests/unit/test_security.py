@@ -1,5 +1,5 @@
-﻿import pytest
 import jwt
+import pytest
 
 from app.core.security import (
     create_access_token,
@@ -30,25 +30,23 @@ class TestPasswordHashing:
 
 class TestJWT:
     def test_access_token_creation_and_decode(self):
-        token = create_access_token(subject="user@example.com")
+        token = create_access_token({"sub": "user@example.com"})
         payload = decode_token(token, expected_type="access")
         assert payload["sub"] == "user@example.com"
         assert payload["type"] == "access"
 
     def test_refresh_token_creation_and_decode(self):
-        token = create_refresh_token(subject="user@example.com")
+        token = create_refresh_token({"sub": "user@example.com"})
         payload = decode_token(token, expected_type="refresh")
         assert payload["sub"] == "user@example.com"
         assert payload["type"] == "refresh"
 
     def test_access_token_rejected_as_refresh(self):
-        token = create_access_token(subject="user@example.com")
+        token = create_access_token({"sub": "user@example.com"})
         with pytest.raises(jwt.InvalidTokenError):
             decode_token(token, expected_type="refresh")
 
     def test_refresh_token_rejected_as_access(self):
-        token = create_refresh_token(subject="user@example.com")
+        token = create_refresh_token({"sub": "user@example.com"})
         with pytest.raises(jwt.InvalidTokenError):
             decode_token(token, expected_type="access")
-
-

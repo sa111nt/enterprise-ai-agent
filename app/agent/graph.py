@@ -4,6 +4,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import create_react_agent
+from pydantic import SecretStr
 
 from app.agent.prompts import SYSTEM_PROMPT
 from app.agent.tools import all_tools
@@ -27,7 +28,7 @@ async def initialize_graph() -> None:
 
     model = ChatOpenAI(
         model=settings.openai_model,
-        api_key=settings.openai_api_key,
+        api_key=SecretStr(settings.openai_api_key) if settings.openai_api_key else None,
         streaming=True,
     )
 

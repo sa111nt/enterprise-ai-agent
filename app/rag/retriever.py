@@ -24,17 +24,19 @@ async def search_documents(
         score_threshold=score_threshold,
     )
 
-    found = [
-        {
-            "text": point.payload["text"],
-            "score": point.score,
-            "document_id": point.payload["document_id"],
-            "document_title": point.payload.get("document_title", ""),
-            "page": point.payload.get("page", 0),
-            "chunk_index": point.payload.get("chunk_index", 0),
-        }
-        for point in results
-    ]
+    found = []
+    for point in results:
+        payload = point.payload or {}
+        found.append(
+            {
+                "text": payload.get("text", ""),
+                "score": point.score,
+                "document_id": payload.get("document_id"),
+                "document_title": payload.get("document_title", ""),
+                "page": payload.get("page", 0),
+                "chunk_index": payload.get("chunk_index", 0),
+            }
+        )
 
     logger.info(
         "Search query returned %d results (top_k=%d, threshold=%.2f)",

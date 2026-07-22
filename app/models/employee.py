@@ -1,9 +1,15 @@
+import datetime
 import enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Date, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.department import Department
+    from app.models.onboarding import OnboardingProgress
 
 
 class EmployeeRole(str, enum.Enum):
@@ -11,7 +17,7 @@ class EmployeeRole(str, enum.Enum):
     admin = "admin"
 
 
-class Employee(TimestampMixin, Base):
+class Employee(Base, TimestampMixin):
     __tablename__ = "employees"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -22,7 +28,7 @@ class Employee(TimestampMixin, Base):
         String(255), unique=True, nullable=False, index=True
     )
     position: Mapped[str] = mapped_column(String(150), nullable=False)
-    hire_date: Mapped[Date] = mapped_column(Date, nullable=False)
+    hire_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
 
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[EmployeeRole] = mapped_column(
@@ -40,20 +46,17 @@ class Employee(TimestampMixin, Base):
         nullable=True,
     )
 
-    department = relationship(
-        "Department",
+    department: Mapped["Department | None"] = relationship(
         back_populates="employees",
         foreign_keys=[department_id],
         lazy="selectin",
     )
-    manager = relationship(
-        "Employee",
+    manager: Mapped["Employee | None"] = relationship(
         remote_side="Employee.id",
         foreign_keys=[manager_id],
         lazy="selectin",
     )
-    onboarding_progress = relationship(
-        "OnboardingProgress",
+    onboarding_progress: Mapped[list["OnboardingProgress"]] = relationship(
         back_populates="employee",
         lazy="selectin",
     )

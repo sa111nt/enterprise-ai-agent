@@ -1,7 +1,8 @@
-﻿"""Password hashing and JWT token management."""
+"""Password hashing and JWT token management."""
 
 import datetime
 import logging
+import typing
 import uuid
 
 import jwt
@@ -22,16 +23,12 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def create_access_token(subject: str) -> str:
+def create_access_token(data: dict) -> str:
+    to_encode = data.copy()
     expire = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
         minutes=settings.access_token_expire_minutes
     )
-    to_encode = {
-        "sub": subject,
-        "exp": expire,
-        "type": "access",
-        "jti": uuid.uuid4().hex,
-    }
+    to_encode.update({"exp": expire, "type": "access", "jti": uuid.uuid4().hex})
     return jwt.encode(
         to_encode,
         settings.jwt_secret_key,
@@ -39,16 +36,12 @@ def create_access_token(subject: str) -> str:
     )
 
 
-def create_refresh_token(subject: str) -> str:
+def create_refresh_token(data: dict) -> str:
+    to_encode = data.copy()
     expire = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
         days=settings.refresh_token_expire_days
     )
-    to_encode = {
-        "sub": subject,
-        "exp": expire,
-        "type": "refresh",
-        "jti": uuid.uuid4().hex,
-    }
+    to_encode.update({"exp": expire, "type": "refresh", "jti": uuid.uuid4().hex})
     return jwt.encode(
         to_encode,
         settings.jwt_secret_key,
@@ -56,7 +49,7 @@ def create_refresh_token(subject: str) -> str:
     )
 
 
-def decode_token(token: str, expected_type: str = "access") -> dict:
+def decode_token(token: str, expected_type: str = "access") -> dict[str, typing.Any]:
     payload = jwt.decode(
         token,
         settings.jwt_secret_key,
@@ -64,6 +57,4 @@ def decode_token(token: str, expected_type: str = "access") -> dict:
     )
     if payload.get("type") != expected_type:
         raise jwt.InvalidTokenError("Invalid token type")
-    return payload
-
-
+    return typing.cast(dict[str, typing.Any], payload)
