@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncGenerator
 
@@ -16,6 +17,15 @@ from app.models.thread import Thread
 from app.rag.cache import SemanticCache
 
 logger = logging.getLogger(__name__)
+
+PERSONAL_QUERY_PATTERN = re.compile(
+    r"\b(my|me|mine|i)\b",
+    re.IGNORECASE,
+)
+
+
+def is_personal_query(message: str) -> bool:
+    return bool(PERSONAL_QUERY_PATTERN.search(message))
 
 
 class AgentService:
@@ -49,23 +59,25 @@ class AgentService:
         thread_id: str,
         employee: Employee,
     ) -> AsyncGenerator[dict, None]:
-        # 1. Check semantic cache
-        cached_answer = await self.cache.get(message)
-        if cached_answer is not None:
-            yield {
-                "event": "cache_hit",
-                "data": json.dumps({"content": cached_answer}),
-            }
-            yield {
-                "event": "done",
-                "data": json.dumps(
-                    {
-                        "thread_id": thread_id,
-                        "contains_personal_data": False,
-                    }
-                ),
-            }
-            return
+        # 1. Check semantic cache (only for non-personal queries)
+        is_personal = is_personal_query(message)
+        if not is_personal:
+            cached_answer = await self.cache.get(message)
+            if cached_answer is not None:
+                yield {
+                    "event": "cache_hit",
+                    "data": json.dumps({"content": cached_answer}),
+                }
+                yield {
+                    "event": "done",
+                    "data": json.dumps(
+                        {
+                            "thread_id": thread_id,
+                            "contains_personal_data": False,
+                        }
+                    ),
+                }
+                return
 
         # 2. Build input with employee context
         enriched = (
@@ -113,9 +125,10 @@ class AgentService:
                 }
 
         # 4. Determine privacy flag
-        contains_personal_data = bool(tools_called & PERSONAL_DATA_TOOLS)
+        has_personal_tool = bool(tools_called & PERSONAL_DATA_TOOLS)
+        contains_personal_data = is_personal or has_personal_tool
 
-        # 5. Cache if no personal data
+        # 5. Cache if strictly no personal data and contains response
         if not contains_personal_data and full_response:
             await self.cache.set(message, full_response)
 

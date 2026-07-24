@@ -165,3 +165,33 @@ async def test_personal_data_cache_exclusion(
     assert json.loads(events[-1]["data"])["contains_personal_data"] is True
 
     mock_cache_instance.set.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_personal_query_cache_exclusion(
+    db_session: AsyncSession, test_employee: Employee, mock_graph, mock_cache
+):
+    # Agent answers without calling any tools (e.g. from prompt context)
+    mock_graph.return_value = DummyGraph(tools_called=[])
+
+    mock_cache_instance = mock_cache.return_value
+    mock_cache_instance.get = AsyncMock(return_value="Cached personal answer")
+    mock_cache_instance.set = AsyncMock()
+
+    service = AgentService(session=db_session)
+
+    events = []
+    async for event in service.stream(
+        "What is my department?", thread_id="dummy", employee=test_employee
+    ):
+        events.append(event)
+
+    # Cache read must be bypassed for personal queries
+    mock_cache_instance.get.assert_not_called()
+
+    # Result must be flagged as personal data
+    assert events[-1]["event"] == "done"
+    assert json.loads(events[-1]["data"])["contains_personal_data"] is True
+
+    # Cache write must not happen
+    mock_cache_instance.set.assert_not_called()

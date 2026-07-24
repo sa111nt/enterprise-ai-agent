@@ -47,7 +47,9 @@ PDFs are loaded page by page (`PyPDFLoader`), split with a recursive character s
 
 ### The semantic cache, and why personal data never gets cached
 
-Every incoming question is embedded and checked against cached query embeddings in Redis before the agent even runs, a cosine similarity above 0.95 counts as a hit, with a 24-hour TTL. To prevent personal data from leaking between users, responses are not cached if the question requires calling sensitive tools like `employee_lookup` or `onboarding_status`.
+General corporate questions are embedded and checked against cached query embeddings in Redis before the agent even runs (cosine similarity above 0.95 counts as a hit, with a 24-hour TTL). To prevent personal data from leaking between employees, a two-layer privacy guardrail is enforced:
+1. **Query Intent Detection**: Questions containing first-person personal pronouns (e.g. *my*, *me*, *mine*, *I*) bypass both cache reading and writing completely, even if the agent answers from prompt context without tool calls. *(Note: in production supporting multi-language deployments, this pattern can be extended with a language-agnostic intent classifier).*
+2. **Tool Scope Exclusion**: Responses are never cached if the agent called sensitive personal tools (`employee_lookup` or `onboarding_status`). Only public corporate knowledge (`search_regulations`, `department_info`, `company_contacts`) is cached.
 
 The lookup itself is a full `SCAN` over every `sem_cache:*` key, followed by a brute-force cosine comparison against each one - O(n) per query. That's fine at the scale this runs at now. Past a few thousand cached entries it would need a real ANN index, most likely a dedicated Qdrant collection, instead of a linear scan.
 
