@@ -143,7 +143,7 @@ Full interactive documentation is generated automatically by FastAPI and served 
 
 | Method | Path                       | Auth     | Description                                           |
 | ------ | -------------------------- | -------- | ----------------------------------------------------- |
-| `GET`  | `/health`                  | -        | Liveness/version check                                |
+| `GET`  | `/health`                  | -        | Health check (PostgreSQL, Redis, Qdrant connectivity) |
 | `POST` | `/api/v1/auth/register`    | -        | Create an employee account                            |
 | `POST` | `/api/v1/auth/login`       | -        | OAuth2 password flow, returns access + refresh tokens |
 | `POST` | `/api/v1/auth/refresh`     | -        | Exchange a refresh token for a new pair               |
@@ -159,7 +159,7 @@ Full interactive documentation is generated automatically by FastAPI and served 
 pytest
 ```
 
-Tests run against an in-memory SQLite database through `httpx`'s ASGI transport, so nothing external needs to be running to execute the suite. Unit tests cover the Pydantic schemas and JWT/password security. Integration tests cover authentication, document upload, the health endpoint, thread ownership, agent streaming, semantic cache behavior, personal-data cache exclusion, and thread isolation.
+Tests run against an in-memory SQLite database through `httpx`'s ASGI transport, so nothing external needs to be running to execute the suite. Unit tests cover the Pydantic schemas and JWT/password security. Integration tests cover authentication, document upload, thread ownership, agent streaming, semantic cache behavior, personal-data cache exclusion, and thread isolation.
 
 A separate agent evaluation pipeline runs a fixed evaluation dataset and checks expected tool selection and answer correctness using structured LLM judging.
 

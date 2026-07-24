@@ -39,3 +39,8 @@ async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
             raise
         finally:
             await session.close()
+
+
+async def close_db() -> None:
+    await engine.dispose()
+    logger.info("Database engine disposed")

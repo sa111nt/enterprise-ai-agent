@@ -2,16 +2,18 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.agent.graph import initialize_graph, shutdown_graph
 from app.api.routers import agent as agent_router
 from app.api.routers import auth as auth_router
 from app.api.routers import documents as documents_router
 from app.config import settings
+from app.core.database import close_db, engine
 from app.core.qdrant import close_qdrant_client, ensure_collection, get_qdrant_client
-from app.core.redis import close_redis_pool, get_redis_pool
+from app.core.redis import close_redis_pool, get_redis_client, get_redis_pool
 
 logging.basicConfig(
     level=logging.DEBUG if settings.debug else logging.INFO,
@@ -34,6 +36,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await shutdown_graph()
     await close_qdrant_client()
     await close_redis_pool()
+    await close_db()
     logger.info("%s shut down gracefully", settings.app_title)
 
 
@@ -66,6 +69,25 @@ app.add_middleware(
 )
 async def health_check() -> dict[str, str]:
     logger.debug("Health check endpoint called")
+    try:
+        # Ping PostgreSQL
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
+
+        # Ping Redis
+        redis = get_redis_client()
+        await redis.ping()
+
+        # Ping Qdrant
+        qdrant = get_qdrant_client()
+        await qdrant.get_collections()
+    except Exception as exc:
+        logger.error("Health check failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Infrastructure dependency unavailable",
+        ) from exc
+
     return {
         "status": "ok",
         "service": settings.app_title,
