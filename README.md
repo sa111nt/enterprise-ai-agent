@@ -43,7 +43,7 @@ Sensitive tools enforce authorization independently of the LLM. Employees can ac
 
 ### RAG pipeline
 
-PDFs are loaded page by page (`PyPDFLoader`), split with a recursive character splitter (1000 characters, 200 overlap), embedded with OpenAI's `text-embedding-3-small` (1536 dimensions), and stored in a Qdrant collection using cosine distance. At query time, retrieval pulls the top 5 chunks above a 0.7 similarity score, and each result comes back with its source document's title and page number so the agent can cite where an answer came from instead of just asserting it.
+PDF uploads are restricted to admins and validated against a 10 MB limit and binary `%PDF-` magic bytes to reject disguised files. Documents are loaded page by page (`PyPDFLoader`), split with a recursive character splitter (1000 characters, 200 overlap), embedded with OpenAI's `text-embedding-3-small` (1536 dimensions), and stored in Qdrant using cosine distance. If ingestion fails, the database transaction is automatically rolled back to prevent orphaned entries. At query time, retrieval pulls the top 5 chunks above a 0.7 similarity score, returning source titles and page numbers so the agent can cite its answers.
 
 ### The semantic cache, and why personal data never gets cached
 

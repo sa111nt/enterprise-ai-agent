@@ -15,6 +15,8 @@ from app.schemas.document import DocumentRead, UploadResponse
 logger = logging.getLogger(__name__)
 
 ALLOWED_CONTENT_TYPE = "application/pdf"
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+PDF_MAGIC_BYTES = b"%PDF-"
 
 
 class DocumentService:
@@ -28,12 +30,24 @@ class DocumentService:
                 detail=f"Only PDF files are accepted, got '{file.content_type}'",
             )
 
+        content = await file.read(MAX_FILE_SIZE + 1)
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="File too large. Maximum size is 10 MB",
+            )
+
+        if not content.startswith(PDF_MAGIC_BYTES):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid PDF file: missing %PDF- header magic bytes",
+            )
+
         filename = file.filename or "untitled.pdf"
         title = Path(filename).stem.replace("_", " ").replace("-", " ").title()
 
         # Save to temp file for PyPDFLoader
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-            content = await file.read()
             tmp.write(content)
             tmp_path = tmp.name
 
@@ -45,14 +59,28 @@ class DocumentService:
             await self.session.refresh(document)
 
             # Run ingestion pipeline
-            client = get_qdrant_client()
-            chunk_count = await ingest_pdf(
-                file_path=tmp_path,
-                document_id=document.id,
-                document_title=title,
-                client=client,
-                collection_name=settings.qdrant_collection,
-            )
+            try:
+                client = get_qdrant_client()
+                chunk_count = await ingest_pdf(
+                    file_path=tmp_path,
+                    document_id=document.id,
+                    document_title=title,
+                    client=client,
+                    collection_name=settings.qdrant_collection,
+                )
+            except Exception as exc:
+                logger.error(
+                    "Failed to ingest document '%s' (id=%d): %s",
+                    filename,
+                    document.id,
+                    exc,
+                    exc_info=True,
+                )
+                await self.session.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to process and index document: {exc}",
+                ) from exc
 
             # Update chunk count
             document.chunk_count = chunk_count
