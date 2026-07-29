@@ -27,6 +27,32 @@ A FastAPI backend for a conversational HR assistant - the kind of thing an emplo
 
 ## Architecture & Key Design Decisions
 
+The system integrates FastAPI with LangGraph reasoning, PostgreSQL for persistent storage and thread checkpoints, Redis for semantic caching, Qdrant for vector search, and OpenAI for LLM inference.
+
+```mermaid
+flowchart LR
+    Client["Client"]
+
+    API["FastAPI API"]
+    DB[("PostgreSQL<br/>corporate data & threads")]
+    Redis[("Redis<br/>semantic cache & tokens")]
+    Qdrant[("Qdrant<br/>vector store")]
+    Agent["LangGraph Agent<br/>ReAct reasoning"]
+    LLM["OpenAI<br/>gpt-4o-mini & embeddings"]
+
+    Client -->|"chat / auth / documents"| API
+    API -->|"auth & thread state"| DB
+    API -->|"token blocklist & cache"| Redis
+    API -->|"document indexing"| Qdrant
+    API -->|"stream query"| Agent
+
+    Agent -->|"reasoning & tools"| LLM
+    Agent -->|"employee & department data"| DB
+    Agent -->|"knowledge retrieval (RAG)"| Qdrant
+
+    API -->|"SSE stream response"| Client
+```
+
 ### Agentic Framework & State Management
 
 The agent orchestrates reasoning and tool execution using **LangGraph**. The core engineering effort focused on defining strict, Pydantic-validated tool schemas with detailed docstrings, which strictly guide the model's tool selection, and designing a robust state architecture.
@@ -36,6 +62,34 @@ Conversation history and agent state are persistently tracked in PostgreSQL usin
 ### Thread isolation
 
 Each conversation thread is persisted in PostgreSQL and owned by a specific employee. The API validates thread ownership before execution, preventing users from accessing another employee's conversation state.
+
+### Data model
+
+The relational schema organizes organizational departments, employee hierarchies, and contacts, while tracking onboarding tasks and isolating conversation threads by employee.
+
+```mermaid
+flowchart TB
+    Department["departments"]
+    Employee["employees"]
+    Contact["contacts"]
+    OnboardingTask["onboarding_tasks"]
+    OnboardingProgress["onboarding_progress"]
+    Thread["threads"]
+    Checkpoint["checkpoints"]
+    Document["documents"]
+
+    Department -->|"1:N"| Employee
+    Department -->|"1:1 (head)"| Employee
+    Department -->|"1:N"| Contact
+    Employee -->|"1:N (manager)"| Employee
+    Employee -->|"1:N"| OnboardingProgress
+    OnboardingTask -->|"1:N"| OnboardingProgress
+    Employee -->|"1:N"| Thread
+    Thread -.->|"thread_id"| Checkpoint
+
+    classDef main stroke-width:3px
+    class Department,Employee main
+```
 
 ### Tool-level authorization
 
