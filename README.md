@@ -6,7 +6,9 @@
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis\&logoColor=white)
 ![Qdrant](https://img.shields.io/badge/Qdrant-1.12-DC244C)
 ![LangGraph](https://img.shields.io/badge/LangGraph-0.2-1C3C3C)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker\&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![pytest](https://img.shields.io/badge/pytest-8.3-0A9EDC?logo=pytest&logoColor=white)
+![CI](https://github.com/sa111nt/enterprise-ai-agent/actions/workflows/ci.yml/badge.svg)
 
 A FastAPI backend for a conversational HR assistant - the kind of thing an employee could ask "how many vacation days do I have left" or "what's the onboarding process for a new hire." Underneath it's a LangGraph ReAct agent with five tools: some query Postgres directly for structured employee and department data, one does vector search over ingested HR policy documents. Responses stream to the client over SSE. Conversation history is kept per-thread in Postgres, and a Redis-backed semantic cache skips the LLM call entirely when a question is close enough to one already answered.
 
@@ -22,6 +24,7 @@ A FastAPI backend for a conversational HR assistant - the kind of thing an emplo
 | AI / Orchestration | LangChain, LangGraph (prebuilt ReAct agent executor), OpenAI (`gpt-4o-mini`, `text-embedding-3-small`) |
 | Auth               | JWT (`PyJWT`), Argon2 password hashing (`pwdlib`)                                                      |
 | Testing            | pytest, pytest-asyncio, httpx (ASGI transport), in-memory SQLite                                       |
+| CI                 | GitHub Actions (Ruff lint & format, Mypy, pytest)                                                      |
 | Infra              | Docker, Docker Compose                                                                                 |
 | Linting            | Ruff                                                                                                   |
 
@@ -218,6 +221,17 @@ Tests run against an in-memory SQLite database through `httpx`'s ASGI transport,
 A separate agent evaluation pipeline runs a fixed evaluation dataset and checks expected tool selection and answer correctness using structured LLM judging.
 
 For the evaluation dataset, examples include onboarding status, employee lookup, and HR policy questions, with the expected tool and expected answer properties defined explicitly.
+
+## Continuous Integration
+
+CI runs on every push and pull request to `main` via GitHub Actions (`.github/workflows/ci.yml`), executing the following checks in order:
+
+1. Ruff lint check (`ruff check .`)
+2. Ruff format check (`ruff format --check .`)
+3. Mypy type checking (`mypy .`)
+4. The full test suite (`pytest -v`)
+
+A green pipeline guarantees that the codebase is linted, formatted, fully type-checked, and all integration tests for agent streaming, thread isolation, semantic caching, and document ingestion pass.
 
 ## License
 

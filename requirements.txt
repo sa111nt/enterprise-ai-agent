@@ -37,8 +37,9 @@ pypdf==5.1.0
 # SSE Streaming
 sse-starlette==2.2.1
 
-# Linting & Formatting (dev)
+# Linting, Typing & Formatting (dev)
 ruff==0.8.4
+mypy==2.3.1
 
 # Testing
 pytest==8.3.4
