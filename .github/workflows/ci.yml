@@ -12,10 +12,34 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: agent_user
+          POSTGRES_PASSWORD: secretpassword
+          POSTGRES_DB: agent_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
-      JWT_SECRET_KEY: test_jwt_secret_key_for_github_actions
-      OPENAI_API_KEY: test_openai_api_key_for_github_actions
-      DATABASE_URL: sqlite+aiosqlite:///:memory:
+      DATABASE_URL: postgresql+asyncpg://agent_user:secretpassword@localhost:5432/agent_db
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET_KEY: test_jwt_secret_key_for_github_actions_minimum_32_chars
 
     steps:
       - name: Checkout code

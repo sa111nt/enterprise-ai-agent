@@ -10,52 +10,7 @@ from app.models.employee import Employee
 from app.models.thread import Thread
 from app.services.agent_service import AgentService
 
-
-@pytest.mark.asyncio
-async def test_thread_isolation(
-    client: AsyncClient,
-    db_session: AsyncSession,
-    admin_employee: Employee,
-    auth_headers: dict[str, str],
-):
-    thread_id = uuid.uuid4().hex
-    thread = Thread(id=thread_id, employee_id=admin_employee.id)
-    db_session.add(thread)
-    await db_session.commit()
-
-    response = await client.post(
-        "/api/v1/agent/chat",
-        headers=auth_headers,
-        json={"message": "hello", "thread_id": thread_id},
-    )
-
-    assert response.status_code == 403
-    assert response.json()["detail"] == "Access to this thread is forbidden."
-
-
-@pytest.mark.asyncio
-async def test_create_new_thread(
-    client: AsyncClient,
-    db_session: AsyncSession,
-    auth_headers: dict[str, str],
-):
-    new_thread_id = uuid.uuid4().hex
-
-    try:
-        await client.post(
-            "/api/v1/agent/chat",
-            headers=auth_headers,
-            json={"message": "hello", "thread_id": new_thread_id},
-        )
-    except Exception:
-        pass
-
-    # Check if thread is in DB
-    thread = await db_session.get(Thread, new_thread_id)
-    assert thread is not None
-
-
-# Mock classes for agent logic testing
+# Mock classes and fixtures for agent logic testing
 
 
 async def dummy_events_generator(tools_called=None):
@@ -92,6 +47,53 @@ def mock_graph():
 def mock_cache():
     with patch("app.services.agent_service.SemanticCache") as mock:
         yield mock
+
+
+@pytest.mark.asyncio
+async def test_thread_isolation(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    admin_employee: Employee,
+    auth_headers: dict[str, str],
+):
+    thread_id = uuid.uuid4().hex
+    thread = Thread(id=thread_id, employee_id=admin_employee.id)
+    db_session.add(thread)
+    await db_session.commit()
+
+    response = await client.post(
+        "/api/v1/agent/chat",
+        headers=auth_headers,
+        json={"message": "hello", "thread_id": thread_id},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Access to this thread is forbidden."
+
+
+@pytest.mark.asyncio
+async def test_create_new_thread(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers: dict[str, str],
+    mock_graph,
+    mock_cache,
+):
+    mock_graph.return_value = DummyGraph()
+    mock_cache.return_value.get = AsyncMock(return_value=None)
+    mock_cache.return_value.set = AsyncMock()
+    new_thread_id = uuid.uuid4().hex
+
+    response = await client.post(
+        "/api/v1/agent/chat",
+        headers=auth_headers,
+        json={"message": "hello", "thread_id": new_thread_id},
+    )
+    assert response.status_code == 200
+
+    # Check if thread is in DB
+    thread = await db_session.get(Thread, new_thread_id)
+    assert thread is not None
 
 
 @pytest.mark.asyncio

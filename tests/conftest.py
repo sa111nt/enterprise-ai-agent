@@ -1,56 +1,79 @@
 import datetime
+import os
 from collections.abc import AsyncGenerator
-from typing import Any
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import pool
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.config import settings
 from app.core.database import get_async_db
-from app.core.redis import close_redis_pool
+from app.core.redis import close_redis_pool, get_redis_client
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models.base import Base
 from app.models.employee import Employee, EmployeeRole
 
-# Use in-memory SQLite for testing
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+PG_ROOT_URL = settings.database_url
+PG_TEST_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    settings.database_url.rsplit("/", 1)[0] + "/agent_test",
+)
 
-engine = create_async_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=pool.StaticPool,
-)
-TestingSessionLocal = async_sessionmaker(
-    bind=engine, class_=AsyncSession, expire_on_commit=False
-)
+_test_db_ready: bool = False
 
 
 @pytest_asyncio.fixture(scope="function")
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
+async def pg_session_factory():
+    global _test_db_ready
+    engine = create_async_engine(PG_TEST_URL, echo=False)
+    factory = async_sessionmaker(
+        bind=engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    if not _test_db_ready:
+        root_engine = create_async_engine(PG_ROOT_URL, isolation_level="AUTOCOMMIT")
+        async with root_engine.connect() as conn:
+            row = await conn.execute(
+                text("SELECT 1 FROM pg_database WHERE datname = 'agent_test'")
+            )
+            if not row.fetchone():
+                await conn.execute(text("CREATE DATABASE agent_test"))
+        await root_engine.dispose()
+        _test_db_ready = True
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    async with TestingSessionLocal() as session:
-        yield session
+    yield factory
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
 
 
 @pytest_asyncio.fixture(scope="function")
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    async def override_get_db():
-        yield db_session
+async def db_session(pg_session_factory) -> AsyncGenerator[AsyncSession, None]:
+    async with pg_session_factory() as session:
+        yield session
+
+
+@pytest_asyncio.fixture(scope="function")
+async def client(pg_session_factory) -> AsyncGenerator[AsyncClient, None]:
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        async with pg_session_factory() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
 
     app.dependency_overrides[get_async_db] = override_get_db
-
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
-
     app.dependency_overrides.clear()
 
 
@@ -100,46 +123,16 @@ async def admin_auth_headers(admin_employee: Employee) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-class FakeRedis:
-    def __init__(self) -> None:
-        self._data: dict[str, Any] = {}
-
-    async def exists(self, *keys: str) -> int:
-        return sum(1 for k in keys if k in self._data)
-
-    async def setex(self, key: str, time: int, value: Any) -> bool:
-        self._data[key] = value
-        return True
-
-    async def incr(self, key: str) -> int:
-        val = int(self._data.get(key, 0)) + 1
-        self._data[key] = val
-        return val
-
-    async def expire(self, key: str, time: int) -> bool:
-        return True
-
-    async def get(self, key: str) -> Any:
-        return self._data.get(key)
-
-    async def aclose(self) -> None:
+@pytest_asyncio.fixture(scope="function", autouse=True)
+async def clean_redis():
+    client = get_redis_client()
+    try:
+        await client.flushdb()
+    except Exception:
         pass
-
-
-@pytest_asyncio.fixture(scope="function", autouse=True)
-def mock_redis(monkeypatch: pytest.MonkeyPatch) -> FakeRedis:
-    fake = FakeRedis()
-    monkeypatch.setattr("app.core.redis.get_redis_client", lambda: fake)
-    monkeypatch.setattr("app.api.dependencies.get_redis_client", lambda: fake)
-    monkeypatch.setattr("app.services.auth_service.get_redis_client", lambda: fake)
-    monkeypatch.setattr("app.services.agent_service.get_redis_client", lambda: fake)
-    return fake
-
-
-@pytest_asyncio.fixture(scope="function", autouse=True)
-async def cleanup_redis():
     yield
     try:
+        await client.flushdb()
         await close_redis_pool()
     except Exception:
         pass
